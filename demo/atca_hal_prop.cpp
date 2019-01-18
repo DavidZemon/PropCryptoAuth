@@ -32,10 +32,16 @@ ATCA_STATUS hal_i2c_send (ATCAIface iface, uint8_t *txdata, int txlength) {
     const auto cfg = atgetifacecfg(iface);
     const auto i2c = (I2CMaster *) atgetifacehaldat(iface);
 
-    pwOut << "Sending " << txlength << " bytes to 0x" << Printer::Format(2, '0', 16) << cfg->atcai2c.slave_address <<
-          Printer::DEFAULT_FORMAT << '\n';
+    pwOut << "Attempting to send the following string of " << txlength "bytes:\n" << Printer::Format(2, '0', 16);
+    pwOut << "\t0 = 0x03\n";
+    for (unsigned int i = 1; i < txlength; ++i) {
+        pwOut << "\t" << i << " = 0x" << (unsigned int) txdata[i] << '\n';
+    }
+    pwOut << Printer::DEFAULT_FORMAT;
 
-    if (i2c->put(cfg->atcai2c.slave_address, txdata[0], &txdata[1], txlength - 1))
+    // The Microchip library inserts an extra (blank) byte into the txdata array for us to insert the 0x03. The
+    // PropWare library does not expect that at all and therefore we send txdata starting with txdata[1]
+    if (i2c->put(cfg->atcai2c.slave_address, static_cast<uint8_t>(0x03), &txdata[1], static_cast<size_t>(txlength - 1)))
         return ATCA_SUCCESS;
     else
         return ATCA_TX_TIMEOUT;
