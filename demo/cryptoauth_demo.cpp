@@ -61,6 +61,11 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
     return printer;
 }
 
+void printer_block(Printer &printer, const uint8_t * const data, const size_t length) {
+    for (int i = length; i; --i)
+        printer.put_int(data[i], 16, 2, '0');
+}
+
 class CryptoDevice {
     public:
         static const uint8_t        SHA256_DEFAULT_ADDRESS = 0xC8;
@@ -87,7 +92,10 @@ class CryptoDevice {
         }
 
         /**
-         * @brief Prepare the library's state variables and wake the device
+         * @brief Prepare the library's state variables
+         *
+         * No wake is necessary - the library will issue a wake before each command is sent
+         *
          * @return 0 upon success, error code otherwise
          */
         PropWare::ErrorCode initialize () {
@@ -106,13 +114,25 @@ class CryptoDevice {
             uint8_t             serialNumber[ATCA_SERIAL_NUM_SIZE];
             check_errors(atcab_read_serial_number(serialNumber));
             printer << "Serial number: 0x";
-            for (int i = ATCA_SERIAL_NUM_SIZE; i; --i)
-                printer.put_int(serialNumber[i], 16, 2, '0');
+            printer_block(printer, serialNumber, ATCA_SERIAL_NUM_SIZE);
             return 0;
+        }
+
+        PropWare::ErrorCode generate_key (const uint16_t keyId, Printer *printer = NULL) {
+            const auto err = atcab_genkey(keyId, this->m_publicKey);
+            if (printer) {
+                if (err) {
+                    printer->println("KEY GEN ERROR");
+                } else {
+                    printer_block(*printer, this->m_publicKey, ATCA_PUB_KEY_SIZE);
+                }
+            }
+            return err;
         }
 
     protected:
         ATCAIfaceCfg m_configuration;
+        uint8_t      m_publicKey[ATCA_PUB_KEY_SIZE];
 };
 
 PropWare::ErrorCode run (CryptoDevice &cryptoDevice) {
@@ -121,6 +141,10 @@ PropWare::ErrorCode run (CryptoDevice &cryptoDevice) {
     check_errors(cryptoDevice.initialize());
     pwOut << "initialized\n";
     check_errors(cryptoDevice.print_serial(pwOut));
+    pwOut << '\n';
+
+    pwOut << "Generating new public/private key: 0x";
+    check_errors(cryptoDevice.generate_key(1, &pwOut));
     pwOut << '\n';
 
     return 0;
