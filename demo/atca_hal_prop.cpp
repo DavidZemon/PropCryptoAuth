@@ -21,7 +21,7 @@ ATCA_STATUS hal_i2c_init (void *hal, ATCAIfaceCfg *cfg) {
     if (cfg->atcai2c.bus >= AVAILABLE_I2C_BUSES) {
         return ATCA_COMM_FAIL;
     }
-    auto const *i2c = i2cBuses[cfg->atcai2c.bus];
+    auto *const i2c = i2cBuses[cfg->atcai2c.bus];
     i2c->set_frequency(cfg->atcai2c.baud);
     ((ATCAHAL_t *) hal)->hal_data = i2c;
     return ATCA_SUCCESS;
@@ -148,7 +148,10 @@ void atca_delay_ms (uint32_t delay) {
 
 ATCA_STATUS hal_i2c_discover_buses (int i2c_buses[], int max_buses) {
     i2c_buses[0] = 0;
-    i2c_buses[1] = 1;
+
+    if (2 <= max_buses)
+        i2c_buses[1] = 1;
+
     return ATCA_SUCCESS;
 }
 

@@ -21,24 +21,10 @@
 
 #include <PropWare/utility/utility.h>
 #include <PropWare/hmi/output/printer.h>
-#include <PropWare/gpio/pin.h>
-#include <PropWare/gpio/simpleport.h>
-#include <PropWare/memory/eeprom.h>
-
-#include <atca_iface.h>
 #include <atca_basic.h>
-#include <atca_hal.h>
-#include <atca_status.h>
-#include "../cryptoauthlib/lib/atca_iface.h"
-#include "../cryptoauthlib/lib/basic/atca_basic.h"
 
 using PropWare::Utility;
 using PropWare::Printer;
-using PropWare::SimplePort;
-using PropWare::Pin;
-using PropWare::I2CMaster;
-
-extern I2CMaster g_i2c;
 
 static const Printer::Format HEX_FMT(2, '0', 16);
 
@@ -77,32 +63,37 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
     return printer;
 }
 
-PropWare::ErrorCode discover () {
+PropWare::ErrorCode initialize () {
     PropWare::ErrorCode err;
 
-    ATCAIfaceCfg ifaceCfgs[4];
-    check_errors(atcab_cfg_discover(ifaceCfgs, Utility::size_of_array(ifaceCfgs)));
-    for (size_t i = 0; i < Utility::size_of_array(ifaceCfgs); ++i)
-        if (ifaceCfgs[i].devtype != ATCA_DEV_UNKNOWN)
-            pwOut << "Found one!\n" << ifaceCfgs[i] << '\n';
+    ATCAIfaceCfg sha256;
+    sha256.iface_type            = ATCA_I2C_IFACE;
+    sha256.devtype               = ATSHA204A;
+    sha256.atcai2c.slave_address = 0xC8;
+    sha256.atcai2c.baud          = 400000;
+    sha256.atcai2c.bus           = 0;
+    sha256.wake_delay            = 800;
+    sha256.rx_retries            = 3;
 
-    err = atcab_release();
+    err = atcab_init(&sha256);
     if (err) {
-        pwOut << "Failed to release after discovery!!! Error code = " << err << '\n';
+        pwOut << "Unable to initialize device:\n" << sha256;
+        return err;
     }
-    return err;
-}
 
-int do_stuff () {
-    PropWare::ErrorCode err;
-
-    check_errors(discover());
+    // Print serial number
+    uint8_t serialNumber[ATCA_SERIAL_NUM_SIZE];
+    check_errors(atcab_read_serial_number(serialNumber));
+    pwOut << "Serial number: 0x";
+    for (int i = ATCA_SERIAL_NUM_SIZE; i; --i)
+        pwOut.put_int(serialNumber[i], 16, 2, '0');
+    pwOut << '\n';
 
     return 0;
 }
 
 int main () {
-    const auto err = do_stuff();
+    const auto err = initialize();
 
     pwOut << "COMPLETE! Status code = " << err << '\n';
 

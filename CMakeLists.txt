@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.3)
 find_package(PropWare REQUIRED)
 project(PropCrypto)
 
-set(MODEL lmm)
+set(MODEL cmm)
 set(BOARD quickstart)
 
 add_subdirectory(cryptoauthlib/lib EXCLUDE_FROM_ALL)
