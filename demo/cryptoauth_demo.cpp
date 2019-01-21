@@ -61,7 +61,7 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
     return printer;
 }
 
-void print_block (Printer &printer, const uint8_t *const data, const size_t length) {
+void print_block (const Printer &printer, const uint8_t *const data, const size_t length) {
     for (int i = length; i; --i)
         printer.put_int(data[i], 16, 2, '0');
 }
@@ -109,7 +109,7 @@ class CryptoDevice {
             return 0;
         }
 
-        PropWare::ErrorCode print_serial (Printer &printer) const {
+        PropWare::ErrorCode print_serial (const Printer &printer) const {
             PropWare::ErrorCode err;
             uint8_t             serialNumber[ATCA_SERIAL_NUM_SIZE];
             check_errors(atcab_read_serial_number(serialNumber));
@@ -118,7 +118,7 @@ class CryptoDevice {
             return 0;
         }
 
-        PropWare::ErrorCode generate_key (const uint16_t keyId, Printer *printer = NULL) {
+        PropWare::ErrorCode generate_key (const uint16_t keyId, const Printer *const printer = NULL) {
             const auto err = atcab_genkey(keyId, this->m_publicKey);
             if (printer) {
                 if (err) {
