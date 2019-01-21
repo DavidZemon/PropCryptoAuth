@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.3)
 find_package(PropWare REQUIRED)
 project(PropCrypto)
 
-set(MODEL cmm)
-set(BOARD activityboard)
+set(MODEL lmm)
+set(BOARD quickstart)
 
 add_subdirectory(cryptoauthlib/lib EXCLUDE_FROM_ALL)
 get_target_property(CRYPTOAUTH_RELATIVE_SRCS cryptoauth SOURCES)

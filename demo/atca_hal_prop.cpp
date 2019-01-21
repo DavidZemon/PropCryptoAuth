@@ -5,25 +5,25 @@
 #include <cryptoauthlib.h>
 #include <atca_hal.h>
 #include <PropWare/serial/i2c/i2cmaster.h>
-#include <PropWare/hmi/output/printer.h>
+#include <PropWare/utility/utility.h>
 
 using PropWare::I2CMaster;
 using PropWare::Pin;
-using PropWare::Printer;
+using PropWare::Utility;
 
 extern "C" {
 
-I2CMaster g_i2c(Pin::Mask::P1, Pin::Mask::P2);
+static I2CMaster g_i2c (Pin::Mask::P1, Pin::Mask::P2);
+static I2CMaster    *i2cBuses[]         = {&pwI2c, &g_i2c};
+static const size_t AVAILABLE_I2C_BUSES = Utility::size_of_array(i2cBuses);
 
 ATCA_STATUS hal_i2c_init (void *hal, ATCAIfaceCfg *cfg) {
-    pwOut << "Made it to the HAL init!\n";
-    if (cfg->atcai2c.bus > 1) {
-        // No support for multiple I2C buses yet... just use the same one as the EEPROM because it's easy
-        pwOut << "bus is bad number " << (int) cfg->atcai2c.bus << '\n';
+    if (cfg->atcai2c.bus >= AVAILABLE_I2C_BUSES) {
         return ATCA_COMM_FAIL;
     }
-    g_i2c.set_frequency(cfg->atcai2c.baud);
-    ((ATCAHAL_t *) hal)->hal_data = &g_i2c;
+    auto const *i2c = i2cBuses[cfg->atcai2c.bus];
+    i2c->set_frequency(cfg->atcai2c.baud);
+    ((ATCAHAL_t *) hal)->hal_data = i2c;
     return ATCA_SUCCESS;
 }
 
@@ -35,16 +35,9 @@ ATCA_STATUS hal_i2c_send (ATCAIface iface, uint8_t *txdata, int txlength) {
     const auto cfg = atgetifacecfg(iface);
     const auto i2c = (I2CMaster *) atgetifacehaldat(iface);
 
-    pwOut << "Attempting to send the following string of " << txlength << "bytes:\n" << Printer::Format(2, '0', 16);
-    pwOut << "\t0 = 0x03\n";
-    for (unsigned int i = 1; i < txlength; ++i) {
-        pwOut << "\t" << i << " = 0x" << (unsigned int) txdata[i] << '\n';
-    }
-    pwOut << Printer::DEFAULT_FORMAT;
-
     // The Microchip library inserts an extra (blank) byte into the txdata array for us to insert the 0x03. The
     // PropWare library does not expect that at all and therefore we send txdata starting with txdata[1]
-    if (i2c->put(cfg->atcai2c.slave_address, static_cast<uint8_t>(0x03), &txdata[1], static_cast<size_t>(txlength - 1)))
+    if (i2c->put(cfg->atcai2c.slave_address, static_cast<uint8_t>(0x03), &txdata[1], static_cast<size_t>(txlength)))
         return ATCA_SUCCESS;
     else
         return ATCA_TX_TIMEOUT;
@@ -59,7 +52,6 @@ ATCA_STATUS hal_i2c_receive (ATCAIface iface, uint8_t *rxdata, uint16_t *rxlengt
 
     *rxlength = 0; // Set the actual length now so that any errors report accurate return values
     if (!rxDataMaxSize) {
-        pwOut << "WTF\n";
         return ATCA_SMALL_BUFFER;
     }
 
@@ -71,12 +63,10 @@ ATCA_STATUS hal_i2c_receive (ATCAIface iface, uint8_t *rxdata, uint16_t *rxlengt
             if (expectedDataLength < ATCA_RSP_SIZE_MIN) {
                 i2c->stop();
                 status = ATCA_INVALID_SIZE;
-                pwOut << "Can't receive " << expectedDataLength << " bytes.\n";
                 break;
             }
             if (expectedDataLength > rxDataMaxSize) {
                 i2c->stop();
-                pwOut << "Can not receive " << expectedDataLength << " bytes into " << rxDataMaxSize << " byte array\n";
                 status = ATCA_SMALL_BUFFER;
                 break;
             }
@@ -157,7 +147,8 @@ void atca_delay_ms (uint32_t delay) {
 }
 
 ATCA_STATUS hal_i2c_discover_buses (int i2c_buses[], int max_buses) {
-    i2c_buses[0] = 1;
+    i2c_buses[0] = 0;
+    i2c_buses[1] = 1;
     return ATCA_SUCCESS;
 }
 

@@ -29,6 +29,8 @@
 #include <atca_basic.h>
 #include <atca_hal.h>
 #include <atca_status.h>
+#include "../cryptoauthlib/lib/atca_iface.h"
+#include "../cryptoauthlib/lib/basic/atca_basic.h"
 
 using PropWare::Utility;
 using PropWare::Printer;
@@ -40,24 +42,24 @@ extern I2CMaster g_i2c;
 
 static const Printer::Format HEX_FMT(2, '0', 16);
 
-extern "C" {
-void putchar (char c) {
-    pwOut << c;
-}
-void putChar (char c) {
-    pwOut << c;
-}
-int  putStr(const char* str) {
-    pwOut << str;
-    return 0;
-}
-int  puts(const char* str) {
-    pwOut << str;
-    return 0;
-}
-void puthex(int x) {
-    pwOut << HEX_FMT << x << Printer::DEFAULT_FORMAT;
-}
+Printer &operator<< (Printer &printer, const ATCADeviceType deviceType) {
+    switch (deviceType) {
+        case ATSHA204A:
+            pwOut << "ATSHA204A";
+            break;
+        case ATECC108A:
+            pwOut << "ATECC108A";
+            break;
+        case ATECC508A:
+            pwOut << "ATECC508A";
+            break;
+        case ATECC608A:
+            pwOut << "ATECC608A";
+            break;
+        default:
+            pwOut << "UNKNOWN";
+    }
+    return printer;
 }
 
 Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
@@ -65,129 +67,44 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
             << "  iface_type=" << cfg.iface_type << '\n'
             << "  devtype=" << cfg.devtype << '\n'
             << "  atcai2c\n"
-            << "    slave_address=" << cfg.atcai2c.slave_address << '\n'
+            << "    slave_address=0x" << HEX_FMT << cfg.atcai2c.slave_address << Printer::DEFAULT_FORMAT << '\n'
             << "    bus=" << cfg.atcai2c.bus << '\n'
             << "    baud=" << cfg.atcai2c.baud << '\n'
             << "  wake_delay=" << cfg.wake_delay << '\n'
             << "  rx_retries=" << cfg.rx_retries << '\n'
-            << "  cfg_data=0x" << HEX_FMT << cfg.cfg_data << Printer::DEFAULT_FORMAT << '\n';
+            << "  cfg_data=0x" << Printer::Format(8, '0', 16) << (uint32_t) cfg.cfg_data << Printer::DEFAULT_FORMAT;
 
     return printer;
 }
 
-static int discover (void) {
+PropWare::ErrorCode discover () {
     PropWare::ErrorCode err;
-    ATCAIfaceCfg        ifaceCfgs[10];
-    int                 i;
-    const char          *devname[] = {"ATSHA204A", "ATAES132A", "ATECC508A", "ATECC608A"};  // indexed by ATCADeviceType
 
-    for (i = 0; i < (int) (Utility::size_of_array(ifaceCfgs)); i++) {
-        ifaceCfgs[i].devtype    = ATCA_DEV_UNKNOWN;
-        ifaceCfgs[i].iface_type = ATCA_UNKNOWN_IFACE;
-    }
-
-    pwOut.printf("Searching...\n");
+    ATCAIfaceCfg ifaceCfgs[4];
     check_errors(atcab_cfg_discover(ifaceCfgs, Utility::size_of_array(ifaceCfgs)));
-    pwOut.printf("Searching for %d configurations\n", Utility::size_of_array(ifaceCfgs));
-    for (i = 0; i < (int) (Utility::size_of_array(ifaceCfgs)); i++) {
-        if (ifaceCfgs[i].devtype != ATCA_DEV_UNKNOWN) {
-            pwOut.printf("Found %s ", devname[ifaceCfgs[i].devtype]);
-            if (ifaceCfgs[i].iface_type == ATCA_I2C_IFACE) {
-                pwOut.printf("@ bus %d addr %02x", ifaceCfgs[i].atcai2c.bus, ifaceCfgs[i].atcai2c.slave_address);
-            }
-            if (ifaceCfgs[i].iface_type == ATCA_SWI_IFACE) {
-                pwOut.printf("@ bus %d", ifaceCfgs[i].atcaswi.bus);
-            }
-            pwOut.printf("\n");
-        } else {
-            pwOut << "Device " << i << " not found\n";
-        }
+    for (size_t i = 0; i < Utility::size_of_array(ifaceCfgs); ++i)
+        if (ifaceCfgs[i].devtype != ATCA_DEV_UNKNOWN)
+            pwOut << "Found one!\n" << ifaceCfgs[i] << '\n';
+
+    err = atcab_release();
+    if (err) {
+        pwOut << "Failed to release after discovery!!! Error code = " << err << '\n';
     }
-
-    return 0;
+    return err;
 }
-
-//static ATCA_STATUS get_info (uint8_t *revision) {
-//    ATCA_STATUS status;
-//
-//    status = atcab_init(gCfg);
-//    if (status != ATCA_SUCCESS) {
-//        printf("atcab_init() failed with ret=0x%08X\r\n", status);
-//        return status;
-//    }
-//
-//    status = atcab_info(revision);
-//    atcab_release();
-//    if (status != ATCA_SUCCESS) {
-//        printf("atcab_info() failed with ret=0x%08X\r\n", status);
-//    }
-//
-//    return status;
-//}
-//
-//static void info (void) {
-//    ATCA_STATUS status;
-//    uint8_t     revision[4];
-//    char        displaystr[15];
-//    size_t      displaylen = sizeof(displaystr);
-//
-//    status = get_info(revision);
-//    if (status == ATCA_SUCCESS) {
-//        // dump revision
-//        atcab_bin2hex(revision, 4, displaystr, &displaylen);
-//        pwOut.printf("revision:\r\n%s\r\n", displaystr);
-//    }
-//}
 
 int do_stuff () {
     PropWare::ErrorCode err;
 
-
-    const SimplePort leds (SimplePort::Mask::P16,
-    8, SimplePort::Dir::OUT);
-    leds.clear();
-
-    unsigned int step = 0;
-    leds.write(++step);
-
-    char version[20];
-    check_errors(atcab_version(version));
-    if (20 <= strlen(version)) {
-        for (size_t i = 0; i < Utility::size_of_array(version); ++i) {
-            pwOut << "version[" << i << "] = " << version[i] << '\n';
-        }
-    } else {
-        pwOut << "Version = " << version << '\n';
-    }
-
-    leds.write(++step);
-
-    ATCAIfaceCfg cfg_array[4];
-    check_errors(atcab_cfg_discover(cfg_array, Utility::size_of_array(cfg_array)));
-
-    leds.write(++step);
-
-    uint8_t deviceRevision[4];
-    check_errors(atcab_info(deviceRevision));
-
-    leds.write(++step);
-
-    pwOut << "Device revision: 0x";
-    for (size_t i = 4; i; --i) {
-        pwOut << HEX_FMT << deviceRevision[i];
-    }
-    pwOut << Printer::DEFAULT_FORMAT << '\n';
+    check_errors(discover());
 
     return 0;
 }
 
 int main () {
-    //const auto err = do_stuff();
+    const auto err = do_stuff();
 
-    const auto err = discover();
-    pwOut << "COMPLETE. Status = 0x" << HEX_FMT << err << '\n';
-
-    while (1);
+    pwOut << "COMPLETE! Status code = " << err << '\n';
 
     return 0;
 }

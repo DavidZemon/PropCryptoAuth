@@ -38,9 +38,6 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
     };
 
     if (bus_num < 0) {
-        puts("bus_num = bad value = ");
-        putDec(bus_num);
-        putchar('\n');
         return ATCA_COMM_FAIL;
     }
 
@@ -56,7 +53,6 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
 #else
     device = newATCADevice(&discoverCfg);
     if (device == NULL) {
-        puts("Device is NULL!!!\n");
         return ATCA_COMM_FAIL;
     }
 #endif
@@ -66,9 +62,6 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
     for (slaveAddress = 0x07; slaveAddress <= 0x78; slaveAddress++) {
         // turn it into an 8-bit address which is what the rest of the i2c HAL is expecting when a packet is sent
         discoverCfg.atcai2c.slave_address = slaveAddress << 1;
-        if (discoverCfg.atcai2c.slave_address != 0xC8)
-            continue;
-        puts("Checking address 0x"); puthex(discoverCfg.atcai2c.slave_address); putchar('\n');
 
         memset(packet.data, 0x00, sizeof(packet.data));
         // build an info command
@@ -77,16 +70,7 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
         // get devrev info and set device type accordingly
         atInfo(device->mCommands, &packet);
         if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS) {
-            puts("Device @ 0x");
-            puthex((int) discoverCfg.atcai2c.slave_address);
-            puts(" responded with error 0x");
-            puthex(status);
-            putchar('\n');
             continue;
-        } else {
-            puts("Found 0x");
-            puthex((int) discoverCfg.atcai2c.slave_address);
-            putchar('\n');
         }
 
         // determine device type from common info and dev rev response byte strings... start with unknown
@@ -122,7 +106,7 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
         if (discoverCfg.devtype != ATCA_DEV_UNKNOWN) {
             // now the device type is known, so update the caller's cfg array element with it
             (*found)++;
-            memcpy((uint8_t *) head, (uint8_t *) &discoverCfg, sizeof(ATCAIfaceCfg));
+            memcpy((uint8_t *) head, (uint8_t * ) & discoverCfg, sizeof(ATCAIfaceCfg));
             head->devtype = discoverCfg.devtype;
             head++;
         }
