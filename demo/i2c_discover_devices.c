@@ -68,6 +68,7 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
         discoverCfg.atcai2c.slave_address = slaveAddress << 1;
         if (discoverCfg.atcai2c.slave_address != 0xC8)
             continue;
+        puts("Checking address 0x"); puthex(discoverCfg.atcai2c.slave_address); putchar('\n');
 
         memset(packet.data, 0x00, sizeof(packet.data));
         // build an info command
@@ -76,13 +77,15 @@ ATCA_STATUS hal_i2c_discover_devices (int bus_num, ATCAIfaceCfg cfg[], int *foun
         // get devrev info and set device type accordingly
         atInfo(device->mCommands, &packet);
         if ((status = atca_execute_command(&packet, device)) != ATCA_SUCCESS) {
-            puts("No response 0x");
-            puthex((int) slaveAddress);
+            puts("Device @ 0x");
+            puthex((int) discoverCfg.atcai2c.slave_address);
+            puts(" responded with error 0x");
+            puthex(status);
             putchar('\n');
             continue;
         } else {
             puts("Found 0x");
-            puthex((int) slaveAddress);
+            puthex((int) discoverCfg.atcai2c.slave_address);
             putchar('\n');
         }
 

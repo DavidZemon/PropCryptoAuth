@@ -36,6 +36,8 @@ using PropWare::SimplePort;
 using PropWare::Pin;
 using PropWare::I2CMaster;
 
+extern I2CMaster g_i2c;
+
 static const Printer::Format HEX_FMT(2, '0', 16);
 
 extern "C" {

@@ -1,0 +1,9 @@
+cmake-build-*/
+build/
+bin/
+.idea/
+.project
+.cproject
+.settings/
+*.o
+CMakeFiles/

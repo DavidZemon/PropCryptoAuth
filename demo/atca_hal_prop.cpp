@@ -8,9 +8,12 @@
 #include <PropWare/hmi/output/printer.h>
 
 using PropWare::I2CMaster;
+using PropWare::Pin;
 using PropWare::Printer;
 
 extern "C" {
+
+I2CMaster g_i2c(Pin::Mask::P1, Pin::Mask::P2);
 
 ATCA_STATUS hal_i2c_init (void *hal, ATCAIfaceCfg *cfg) {
     pwOut << "Made it to the HAL init!\n";
@@ -19,8 +22,8 @@ ATCA_STATUS hal_i2c_init (void *hal, ATCAIfaceCfg *cfg) {
         pwOut << "bus is bad number " << (int) cfg->atcai2c.bus << '\n';
         return ATCA_COMM_FAIL;
     }
-    pwI2c.set_frequency(cfg->atcai2c.baud);
-    ((ATCAHAL_t *) hal)->hal_data = &pwI2c;
+    g_i2c.set_frequency(cfg->atcai2c.baud);
+    ((ATCAHAL_t *) hal)->hal_data = &g_i2c;
     return ATCA_SUCCESS;
 }
 
@@ -32,7 +35,7 @@ ATCA_STATUS hal_i2c_send (ATCAIface iface, uint8_t *txdata, int txlength) {
     const auto cfg = atgetifacecfg(iface);
     const auto i2c = (I2CMaster *) atgetifacehaldat(iface);
 
-    pwOut << "Attempting to send the following string of " << txlength "bytes:\n" << Printer::Format(2, '0', 16);
+    pwOut << "Attempting to send the following string of " << txlength << "bytes:\n" << Printer::Format(2, '0', 16);
     pwOut << "\t0 = 0x03\n";
     for (unsigned int i = 1; i < txlength; ++i) {
         pwOut << "\t" << i << " = 0x" << (unsigned int) txdata[i] << '\n';
@@ -68,6 +71,7 @@ ATCA_STATUS hal_i2c_receive (ATCAIface iface, uint8_t *rxdata, uint16_t *rxlengt
             if (expectedDataLength < ATCA_RSP_SIZE_MIN) {
                 i2c->stop();
                 status = ATCA_INVALID_SIZE;
+                pwOut << "Can't receive " << expectedDataLength << " bytes.\n";
                 break;
             }
             if (expectedDataLength > rxDataMaxSize) {
