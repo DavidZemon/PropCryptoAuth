@@ -19,11 +19,9 @@
  * IN THE SOFTWARE.
  */
 
-#include <PropWare/utility/utility.h>
 #include <PropWare/hmi/output/printer.h>
 #include <atca_basic.h>
 
-using PropWare::Utility;
 using PropWare::Printer;
 
 static const Printer::Format HEX_FMT(2, '0', 16);
@@ -63,39 +61,75 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
     return printer;
 }
 
-PropWare::ErrorCode initialize () {
+class CryptoDevice {
+    public:
+        static const uint8_t        SHA256_DEFAULT_ADDRESS = 0xC8;
+        static const ATCADeviceType DEFAULT_DEVICE_TYPE    = ATSHA204A;
+        static const uint32_t       DEFAULT_BAUD           = 400000;
+        static const uint8_t        DEFAULT_BUS            = 0;
+        static const uint16_t       DEFAULT_WAKE_DELAY     = 800;
+        static const uint8_t        DEFAULT_RX_RETRIES     = 3;
+
+    public:
+        CryptoDevice (const uint8_t slaveAddress = SHA256_DEFAULT_ADDRESS,
+                      const ATCADeviceType deviceType = DEFAULT_DEVICE_TYPE,
+                      const uint32_t baud = DEFAULT_BAUD,
+                      const uint8_t bus = DEFAULT_BUS,
+                      const uint16_t wakeDelay = DEFAULT_WAKE_DELAY,
+                      const uint8_t rxRetries = DEFAULT_RX_RETRIES) {
+            this->m_configuration.iface_type            = ATCA_I2C_IFACE;
+            this->m_configuration.devtype               = deviceType;
+            this->m_configuration.atcai2c.slave_address = slaveAddress;
+            this->m_configuration.atcai2c.baud          = baud;
+            this->m_configuration.atcai2c.bus           = bus;
+            this->m_configuration.wake_delay            = wakeDelay;
+            this->m_configuration.rx_retries            = rxRetries;
+        }
+
+        /**
+         * @brief Prepare the library's state variables and wake the device
+         * @return 0 upon success, error code otherwise
+         */
+        PropWare::ErrorCode initialize () {
+            return atcab_init(&this->m_configuration);
+        }
+
+        PropWare::ErrorCode sleep () {
+            PropWare::ErrorCode err;
+            check_errors(atcab_sleep());
+            check_errors(atcab_release());
+            return 0;
+        }
+
+        PropWare::ErrorCode print_serial (Printer &printer) const {
+            PropWare::ErrorCode err;
+            uint8_t             serialNumber[ATCA_SERIAL_NUM_SIZE];
+            check_errors(atcab_read_serial_number(serialNumber));
+            printer << "Serial number: 0x";
+            for (int i = ATCA_SERIAL_NUM_SIZE; i; --i)
+                printer.put_int(serialNumber[i], 16, 2, '0');
+            return 0;
+        }
+
+    protected:
+        ATCAIfaceCfg m_configuration;
+};
+
+PropWare::ErrorCode run (CryptoDevice &cryptoDevice) {
     PropWare::ErrorCode err;
 
-    ATCAIfaceCfg sha256;
-    sha256.iface_type            = ATCA_I2C_IFACE;
-    sha256.devtype               = ATSHA204A;
-    sha256.atcai2c.slave_address = 0xC8;
-    sha256.atcai2c.baud          = 400000;
-    sha256.atcai2c.bus           = 0;
-    sha256.wake_delay            = 800;
-    sha256.rx_retries            = 3;
-
-    err = atcab_init(&sha256);
-    if (err) {
-        pwOut << "Unable to initialize device:\n" << sha256;
-        return err;
-    }
-
-    // Print serial number
-    uint8_t serialNumber[ATCA_SERIAL_NUM_SIZE];
-    check_errors(atcab_read_serial_number(serialNumber));
-    pwOut << "Serial number: 0x";
-    for (int i = ATCA_SERIAL_NUM_SIZE; i; --i)
-        pwOut.put_int(serialNumber[i], 16, 2, '0');
+    check_errors(cryptoDevice.initialize());
+    pwOut << "initialized\n";
+    check_errors(cryptoDevice.print_serial(pwOut));
     pwOut << '\n';
 
     return 0;
 }
 
 int main () {
-    const auto err = initialize();
-
-    pwOut << "COMPLETE! Status code = " << err << '\n';
-
+    CryptoDevice cryptoDevice;
+    const auto   err = run(cryptoDevice);
+    pwOut << "COMPLETE! Status code = 0x" << HEX_FMT << err << '\n';
+    cryptoDevice.sleep();
     return 0;
 }
