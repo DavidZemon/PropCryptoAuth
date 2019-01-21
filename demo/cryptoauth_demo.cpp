@@ -61,15 +61,15 @@ Printer &operator<< (Printer &printer, const ATCAIfaceCfg &cfg) {
     return printer;
 }
 
-void printer_block(Printer &printer, const uint8_t * const data, const size_t length) {
+void print_block (Printer &printer, const uint8_t *const data, const size_t length) {
     for (int i = length; i; --i)
         printer.put_int(data[i], 16, 2, '0');
 }
 
 class CryptoDevice {
     public:
-        static const uint8_t        SHA256_DEFAULT_ADDRESS = 0xC8;
-        static const ATCADeviceType DEFAULT_DEVICE_TYPE    = ATSHA204A;
+        static const uint8_t        SHA256_DEFAULT_ADDRESS = 0xC0;
+        static const ATCADeviceType DEFAULT_DEVICE_TYPE    = ATECC608A;
         static const uint32_t       DEFAULT_BAUD           = 400000;
         static const uint8_t        DEFAULT_BUS            = 0;
         static const uint16_t       DEFAULT_WAKE_DELAY     = 800;
@@ -114,7 +114,7 @@ class CryptoDevice {
             uint8_t             serialNumber[ATCA_SERIAL_NUM_SIZE];
             check_errors(atcab_read_serial_number(serialNumber));
             printer << "Serial number: 0x";
-            printer_block(printer, serialNumber, ATCA_SERIAL_NUM_SIZE);
+            print_block(printer, serialNumber, ATCA_SERIAL_NUM_SIZE);
             return 0;
         }
 
@@ -124,7 +124,7 @@ class CryptoDevice {
                 if (err) {
                     printer->println("KEY GEN ERROR");
                 } else {
-                    printer_block(*printer, this->m_publicKey, ATCA_PUB_KEY_SIZE);
+                    print_block(*printer, this->m_publicKey, ATCA_PUB_KEY_SIZE);
                 }
             }
             return err;
