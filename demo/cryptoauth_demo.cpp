@@ -27,6 +27,8 @@ using PropWare::Printer;
 using PropWare::Utility;
 using PropWare::BlockStorage;
 
+#define BYTE_SWAP(x) (((x & 0xff00) >> 8) | (x & 0xff))
+
 /**
  * @brief Combine slot configuration values into a two-byte slot configuration
  *
@@ -40,14 +42,14 @@ using PropWare::BlockStorage;
  *                              combination of `(EcdhOutputTarget | EcdhPermission | MessageSignatureEnable |
  *                              ExternalSignatureEnable)`
  */
-#define SLOT_CONFIGURATION(writeConfig, writeKey, isSecret, encryptRead, limitedUse, noMac, readKey) ( \
+#define SLOT_CONFIGURATION(writeConfig, writeKey, isSecret, encryptRead, limitedUse, noMac, readKey) BYTE_SWAP( \
     ((writeConfig & 0x0f) << 12) | \
     ((writeKey & 0x0f) << 8) | \
     isSecret | \
     encryptRead | \
     limitedUse | \
     noMac | \
-    (readKey & 0x0f)
+    (readKey & 0x0f) \
 )
 
 typedef enum {
@@ -98,6 +100,10 @@ typedef enum {
  * a big block.
  *
  * 0xFF will be used for the read-only bytes serial number and revision information
+ *
+ * @note This method is NOT ideal because it prevents the program from computing a valid CRC for the configuration
+ *       data block. It would be better to read the configuration zone at runtime, then set only the bits/bytes that
+ *       matter for the application, calculate a CRC, and then write the data back with the checksum included.
  */
 // @formatter:off
 static const uint8_t CONFIG_ZONE_DATA_ATECC508A[] = {
@@ -106,7 +112,7 @@ static const uint8_t CONFIG_ZONE_DATA_ATECC508A[] = {
 /* 0x10 */ 0xC0, 0x00, 0x55, 0x00,
 
 // Special slot configuration (bytes 20-51)
-/* 0x10 */                         0x83, 0x20, 0x87, 0x20,   0x8F, 0x20, 0xC4, 0x8F, 0x8F, 0x8F, 0x8F, 0x8F,
+/* 0x10 */                         DEFLT_SLOT, 0x87, 0x20,   0x8F, 0x20, 0xC4, 0x8F, 0x8F, 0x8F, 0x8F, 0x8F,
 /* 0x20 */ 0x9F, 0x8F, 0xAF, 0x8F, 0x00, 0x00, 0x00, 0x00,   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 /* 0x30 */ 0x00, 0x00, 0xAF, 0x8F,
 
