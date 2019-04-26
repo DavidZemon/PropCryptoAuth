@@ -50,7 +50,7 @@ using PropWare::BlockStorage;
     encryptRead | \
     limitedUse | \
     noMac | \
-    (readKey & 0x0f00) \
+    (readKey & 0x0f) \
 )
 
 typedef enum {
