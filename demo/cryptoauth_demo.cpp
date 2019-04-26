@@ -93,17 +93,55 @@ typedef enum {
     ENABLE_EXT_SIGNATURES = 0x01
 } ExternalSignatureEnable;
 
+class SlotConfig {
+    public:
+        static const SlotConfig PUBLIC_KEY;
+
+    public:
+        SlotConfig (unsigned int readKeyId,
+                    bool disableMacCommand,
+                    bool limitedUse,
+                    bool encryptedRead,
+                    bool isSecret,
+                    unsigned int writeKeyId,
+                    unsigned int writeConfig)
+                : readKeyId(readKeyId),
+                  disableMacCommand(disableMacCommand),
+                  limitedUse(limitedUse),
+                  encryptedRead(encryptedRead),
+                  isSecret(isSecret),
+                  writeKeyId(writeKeyId),
+                  writeConfig(writeConfig) {
+        }
+
+        uint16_t raw () const {
+            return *(uint16_t *) this;
+        }
+
+        // @formatter:off
+        unsigned int    readKeyId:          4;
+        bool            disableMacCommand:  1;
+        bool            limitedUse:         1;
+        bool            encryptedRead:      1;
+        bool            isSecret:           1;
+        unsigned int    writeKeyId:         4;
+        unsigned int    writeConfig:        4;
+        // @formatter:on
+};
+
+const SlotConfig SlotConfig::PUBLIC_KEY(1, false, false, false, true, 0, 0b0010);
+
 #define SPLIT(x) static_cast<uint8_t>(x), static_cast<uint8_t>(x >> 8)
 
 #define SWAP(x) static_cast<uint16_t>((x << 8) | (x & 0xff))
 
-#define PUBLIC_KEY SLOT_CONFIGURATION(0b0010, 0, SLOT_IS_SECRET, SLOT_IS_PLAIN_TEXT, SLOT_USE_UNLIMITED, \
+#define PUBLIC_KEY_CONFIG SLOT_CONFIGURATION(0b0010, 0, SLOT_IS_SECRET, SLOT_IS_PLAIN_TEXT, SLOT_USE_UNLIMITED, \
                                       NO_USAGE_RESTRICTIONS, 1)
 
 /**
  * @brief Swap the bytes and split them into two distinct parameters that can be added as literals in a byte-array
  */
-#define _PUB_KEY SPLIT(SWAP(PUBLIC_KEY))
+#define _PUB_KEY SPLIT(SWAP(PUBLIC_KEY_CONFIG))
 
 /**
  * @brief Complete configuration data for the ATECC508A
@@ -281,7 +319,11 @@ PropWare::ErrorCode run (CryptoDevice &cryptoDevice) {
     BlockStorage::print_block(pwOut, configData, configDataSize);
 
     pwOut << "Slot config: 0x";
-    pwOut.put_int(PUBLIC_KEY, 16, 4, '0');
+    pwOut.put_int(PUBLIC_KEY_CONFIG, 16, 4, '0');
+    pwOut << '\n';
+
+    pwOut << "Slot config: 0x";
+    pwOut.put_int(SlotConfig::PUBLIC_KEY.raw(), 16, 4, '0');
     pwOut << '\n';
 
     //pwOut << "Writing modified configuration zone data\n";
